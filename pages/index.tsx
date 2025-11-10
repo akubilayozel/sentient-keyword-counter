@@ -1,4 +1,4 @@
-// --- UI CONFIG ---
+// --- UI CONFIG (placeholder) ---
 const KEYWORDS: { label: string; total: number }[] = [
   { label: "gsent", total: 100 },
   { label: "Sentient", total: 50 },
@@ -6,7 +6,7 @@ const KEYWORDS: { label: string; total: number }[] = [
   { label: "GRID", total: 5 },
   { label: "ROMA", total: 0 },
 ];
-// UI’yi görmek için true/false yapabilirsin (auth henüz yok)
+// Show profile area (auth not wired yet)
 const SHOW_PROFILE = true;
 
 export default function Home() {
@@ -14,31 +14,26 @@ export default function Home() {
 
   return (
     <main style={styles.main}>
-      {/* ---- Sentient "logo" başlığı ---- */}
-      <div style={styles.logoWrap}>
-        <span style={styles.logoText}>Sentient</span>
+      {/* ---- Brand / “logo” ---- */}
+      <div style={styles.hero}>
+        <div style={styles.logoText}>Sentient</div>
+        <p style={styles.tagline}>
+          Connect your X (Twitter) account. See how much you contribute to Sentient on X.
+          <br />
+          We count posts, replies, quotes and retweets that include{" "}
+          <b>gsent, Sentient, Dobby, GRID, ROMA</b>.
+        </p>
+
+        <button onClick={() => {}} style={styles.signBtn}>
+          Sign in with X
+        </button>
       </div>
 
-      {/* ---- Proje tagline (Türkçe metin) ---- */}
-      <p style={styles.tagline}>
-        <b>X (Twitter)</b> hesabını bağla. X’te Sentient’e ne kadar katkı verdiğini gör.
-        <br />
-        <span style={{ opacity: 0.9 }}>
-          <b>gsent, Sentient, Dobby, GRID, ROMA</b> kelimelerini içeren postları, yorumları, alıntıları ve RT’leri sayar.
-        </span>
-      </p>
-
-      {/* ---- Sign in with X (UI only) ---- */}
-      <div style={{ textAlign: "center", marginTop: 12 }}>
-        <button onClick={() => {}} style={styles.signBtn}>Sign in with X</button>
-      </div>
-
-      {/* ---- Profil kartı (placeholder) ---- */}
+      {/* ---- Profile summary (placeholder) ---- */}
       {SHOW_PROFILE && (
         <section style={styles.profileCard}>
           <img
             alt="Twitter Avatar"
-            // İstersen burada @kullanici için unavatar kullanabilirsin: https://unavatar.io/twitter/<handle>
             src="https://unavatar.io/twitter/sentientagi"
             style={styles.avatar}
           />
@@ -47,15 +42,18 @@ export default function Home() {
               <span style={styles.displayName}>Maje</span>
               <span style={styles.handle}>@maje53</span>
             </div>
-            <div style={styles.kpi}>
-              <span style={{ fontSize: 12, color: "#6b7280", letterSpacing: 0.2 }}>Total Keywords</span>
-              <div style={{ fontSize: 22, fontWeight: 700 }}>{totalKeywords.toLocaleString("tr-TR")}</div>
+
+            <div style={styles.kpiRow}>
+              <span style={styles.kpiLabel}>Total Keywords</span>
+              <span style={styles.kpiValue}>
+                {totalKeywords.toLocaleString("en-US")}
+              </span>
             </div>
           </div>
         </section>
       )}
 
-      {/* ---- Ana tablo (yuvarlatılmış) ---- */}
+      {/* ---- Rounded table ---- */}
       <section style={{ marginTop: 18 }}>
         <div style={styles.tableWrap}>
           <table style={styles.table}>
@@ -80,20 +78,17 @@ export default function Home() {
   );
 }
 
-/* ---------- inline stiller ---------- */
+/* ---------- inline styles ---------- */
 const styles: Record<string, React.CSSProperties> = {
   main: {
     maxWidth: 920,
     margin: "28px auto",
     padding: "0 16px",
-    fontFamily: "Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif",
+    fontFamily:
+      "Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif",
     color: "#0f172a",
   },
-  logoWrap: {
-    display: "flex",
-    justifyContent: "center",
-    marginTop: 8,
-  },
+  hero: { textAlign: "center", marginTop: 4 },
   logoText: {
     fontSize: 72,
     lineHeight: 1,
@@ -101,12 +96,12 @@ const styles: Record<string, React.CSSProperties> = {
     letterSpacing: -1.2,
   },
   tagline: {
-    textAlign: "center",
-    marginTop: 14,
+    marginTop: 10,
     fontSize: 16,
     color: "#475569",
   },
   signBtn: {
+    marginTop: 16,
     padding: "12px 20px",
     borderRadius: 10,
     border: "1px solid #1d4ed8",
@@ -127,43 +122,21 @@ const styles: Record<string, React.CSSProperties> = {
     border: "1px solid #e5e7eb",
     boxShadow: "0 1px 6px rgba(0,0,0,0.04)",
   },
-  avatar: {
-    width: 64,
-    height: 64,
-    borderRadius: "50%",
-    objectFit: "cover",
-  },
-  nameRow: {
-    display: "flex",
-    alignItems: "baseline",
-    gap: 10,
-  },
-  displayName: {
-    fontSize: 18,
-    fontWeight: 700,
-  },
-  handle: {
-    fontSize: 14,
-    color: "#6b7280",
-  },
-  kpi: {
-    marginTop: 4,
-    display: "flex",
-    flexDirection: "column",
-    gap: 4,
-  },
+  avatar: { width: 64, height: 64, borderRadius: "50%", objectFit: "cover" },
+  nameRow: { display: "flex", alignItems: "baseline", gap: 10 },
+  displayName: { fontSize: 18, fontWeight: 700 },
+  handle: { fontSize: 14, color: "#6b7280" },
+  kpiRow: { marginTop: 4, display: "flex", gap: 8, alignItems: "baseline" },
+  kpiLabel: { fontSize: 12, color: "#6b7280", letterSpacing: 0.2 },
+  kpiValue: { fontSize: 22, fontWeight: 800 },
   tableWrap: {
     borderRadius: 12,
-    overflow: "hidden", // köşeleri gerçekten yuvarlatmak için önemli
+    overflow: "hidden",
     border: "1px solid #e5e7eb",
     background: "#fff",
     boxShadow: "0 1px 6px rgba(0,0,0,0.04)",
   },
-  table: {
-    width: "100%",
-    borderCollapse: "separate",
-    borderSpacing: 0,
-  },
+  table: { width: "100%", borderCollapse: "separate", borderSpacing: 0 },
   th: {
     textAlign: "left" as const,
     padding: "12px 14px",
@@ -178,10 +151,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: "#f8fafc",
     borderBottom: "1px solid #e5e7eb",
   },
-  td: {
-    padding: "12px 14px",
-    borderBottom: "1px solid #f1f5f9",
-  },
+  td: { padding: "12px 14px", borderBottom: "1px solid #f1f5f9" },
   tdRight: {
     padding: "12px 14px",
     borderBottom: "1px solid #f1f5f9",

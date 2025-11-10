@@ -2,51 +2,31 @@ const KEYWORDS = ["gsent", "sentient", "roma", "grid", "loyal"];
 
 export default function Home() {
   return (
-    <main style={{ maxWidth: 920, margin: "28px auto", padding: "0 16px", fontFamily: "Inter, system-ui, sans-serif" }}>
+    <main style={main}>
       {/* Başlık */}
-      <h1 style={{ fontSize: 36, margin: 0 }}>Sentient Keyword Counter</h1>
+      <h1 style={h1}>Sentient Keyword Counter</h1>
 
       {/* Alt açıklama */}
-      <p style={{ color: "#667085", marginTop: 8 }}>
+      <p style={sub}>
         <b>Keywords (substring)</b> • <b>Counting:</b> Posts • Replies • Quotes • RTs
       </p>
 
       {/* Keyword chips */}
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "12px 0 20px" }}>
+      <div style={chipsRow}>
         {KEYWORDS.map((k) => (
-          <span
-            key={k}
-            style={{
-              padding: "6px 10px",
-              border: "1px solid #E5E7EB",
-              borderRadius: 999,
-              background: "#F9FAFB"
-            }}
-          >
-            {k}
-          </span>
+          <span key={k} style={chip}>{k}</span>
         ))}
       </div>
 
-      {/* Sign in with X (şimdilik pasif) */}
+      {/* Sign in with X (UI-only) */}
       <div style={{ margin: "6px 0 24px" }}>
-        <button
-          onClick={() => {}}
-          style={{
-            padding: "12px 18px",
-            borderRadius: 10,
-            border: "1px solid #2563eb",
-            background: "#2563eb",
-            color: "white",
-            fontWeight: 600
-          }}
-        >
+        <button onClick={() => {}} style={btn}>
           Sign in with X
         </button>
       </div>
 
       {/* Sonuçlar (placeholder) */}
-      <section style={{ border: "1px solid #E5E7EB", borderRadius: 12, padding: 16, background: "#fff" }}>
+      <section style={card}>
         <h2 style={{ marginTop: 0 }}>Sonuçlar @username</h2>
         <p style={{ margin: "4px 0", color: "#667085" }}>
           Taranan tweet: <b>234</b> &nbsp;/&nbsp; Mod: <b>substring</b>
@@ -86,5 +66,13 @@ export default function Home() {
   );
 }
 
+/* ——— inline stiller ——— */
+const main: React.CSSProperties = { maxWidth: 920, margin: "28px auto", padding: "0 16px", fontFamily: "Inter, system-ui, sans-serif" };
+const h1: React.CSSProperties = { fontSize: 36, margin: 0 };
+const sub: React.CSSProperties = { color: "#667085", marginTop: 8 };
+const chipsRow: React.CSSProperties = { display: "flex", gap: 8, flexWrap: "wrap", margin: "12px 0 20px" };
+const chip: React.CSSProperties = { padding: "6px 10px", border: "1px solid #E5E7EB", borderRadius: 999, background: "#F9FAFB" };
+const btn: React.CSSProperties = { padding: "12px 18px", borderRadius: 10, border: "1px solid #2563eb", background: "#2563eb", color: "#fff", fontWeight: 600 };
+const card: React.CSSProperties = { border: "1px solid #E5E7EB", borderRadius: 12, padding: 16, background: "#fff" };
 const th: React.CSSProperties = { border: "1px solid #E5E7EB", padding: "10px 8px", textAlign: "left", background: "#F9FAFB" };
 const td: React.CSSProperties = { border: "1px solid #E5E7EB", padding: "10px 8px", textAlign: "left" };

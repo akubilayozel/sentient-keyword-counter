@@ -27,6 +27,64 @@ export default function Home() {
           </span>
         ))}
       </div>
+
+      {/* Sign in with X (şimdilik pasif) */}
+      <div style={{ margin: "6px 0 24px" }}>
+        <button
+          onClick={() => {}}
+          style={{
+            padding: "12px 18px",
+            borderRadius: 10,
+            border: "1px solid #2563eb",
+            background: "#2563eb",
+            color: "white",
+            fontWeight: 600
+          }}
+        >
+          Sign in with X
+        </button>
+      </div>
+
+      {/* Sonuçlar (placeholder) */}
+      <section style={{ border: "1px solid #E5E7EB", borderRadius: 12, padding: 16, background: "#fff" }}>
+        <h2 style={{ marginTop: 0 }}>Sonuçlar @username</h2>
+        <p style={{ margin: "4px 0", color: "#667085" }}>
+          Taranan tweet: <b>234</b> &nbsp;/&nbsp; Mod: <b>substring</b>
+        </p>
+        <p style={{ margin: "4px 0 16px", fontSize: 18 }}>
+          Senin toplamın: <b>175</b>
+        </p>
+
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr>
+                <th style={th}>Keyword</th>
+                <th style={th}>Total</th>
+                <th style={th}>Examples</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[
+                { k: "gsent", t: 100, e: "…" },
+                { k: "sentient", t: 50, e: "…" },
+                { k: "roma", t: 25, e: "…" },
+                { k: "grid", t: 0, e: "–" },
+                { k: "loyal", t: 0, e: "–" }
+              ].map((row) => (
+                <tr key={row.k}>
+                  <td style={td}>{row.k}</td>
+                  <td style={td}>{row.t}</td>
+                  <td style={td}>{row.e}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
     </main>
   );
 }
+
+const th: React.CSSProperties = { border: "1px solid #E5E7EB", padding: "10px 8px", textAlign: "left", background: "#F9FAFB" };
+const td: React.CSSProperties = { border: "1px solid #E5E7EB", padding: "10px 8px", textAlign: "left" };

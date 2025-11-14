@@ -1,4 +1,7 @@
-// --- UI CONFIG (placeholder) ---
+import { useState } from "react";
+import type React from "react";
+
+// --- UI CONFIG (placeholder data) ---
 const KEYWORDS: { label: string; total: number }[] = [
   { label: "gsent", total: 100 },
   { label: "Sentient", total: 50 },
@@ -7,11 +10,24 @@ const KEYWORDS: { label: string; total: number }[] = [
   { label: "ROMA", total: 0 },
 ];
 
-// Show profile (placeholder until OAuth)
-const SHOW_PROFILE = true;
-
 export default function Home() {
+  const [isAuthed, setIsAuthed] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+
   const totalKeywords = KEYWORDS.reduce((s, k) => s + k.total, 0);
+
+  const handleClick = () => {
+    // burada ileride gerçek OAuth + API call olacak
+    setIsLoading(true);
+
+    // şimdilik sadece fake bir loading simulasyonu
+    setTimeout(() => {
+      setIsLoading(false);
+      setIsAuthed(true);
+    }, 900);
+  };
+
+  const buttonLabel = isAuthed ? "Recalculate" : "Sign in with X";
 
   return (
     <main style={styles.main}>
@@ -26,58 +42,101 @@ export default function Home() {
           <b>gsent, Sentient, Dobby, GRID, ROMA</b>.
         </p>
 
-        <button onClick={() => {}} style={styles.signBtn}>
-          Sign in with X
+        <button
+          onClick={handleClick}
+          style={{
+            ...styles.signBtn,
+            opacity: isLoading ? 0.7 : 1,
+            cursor: isLoading ? "default" : "pointer",
+          }}
+          disabled={isLoading}
+        >
+          {isLoading ? "Calculating…" : buttonLabel}
         </button>
       </div>
 
-      {/* ---- PROFILE CARD (mock) ---- */}
-      {SHOW_PROFILE && (
-        <section style={styles.profileCard}>
-          <img
-            alt="Twitter Avatar"
-            src="https://unavatar.io/twitter/sentientagi"
-            style={styles.avatar}
-          />
-
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={styles.nameRow}>
-              <span style={styles.displayName}>Kubilay</span>
-              <span style={styles.handle}>@username</span>
+      {/* ---- LOADING SKELETON ---- */}
+      {isLoading ? (
+        <>
+          <section style={styles.skeletonCard}>
+            <div style={styles.skeletonAvatar} />
+            <div style={{ flex: 1 }}>
+              <div style={styles.skeletonLineWide} />
+              <div style={styles.skeletonLineNarrow} />
             </div>
+          </section>
 
-            <div style={styles.kpiRow}>
-              <span style={styles.kpiLabel}>Total Keywords</span>
-              <span style={styles.kpiValue}>
-                {totalKeywords.toLocaleString("en-US")}
-              </span>
+          <section style={{ marginTop: 18 }}>
+            <div style={styles.skeletonTableHeader} />
+            <div style={styles.skeletonTableRow} />
+            <div style={styles.skeletonTableRow} />
+            <div style={styles.skeletonTableRow} />
+          </section>
+        </>
+      ) : (
+        <>
+          {/* ---- PROFILE CARD (mock, sadece sign-in sonrası) ---- */}
+          {isAuthed && (
+            <section style={styles.profileCard}>
+              <img
+                alt="Twitter Avatar"
+                src="https://unavatar.io/twitter/sentientagi"
+                style={styles.avatar}
+              />
+
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={styles.nameRow}>
+                  <span style={styles.displayName}>Kubilay</span>
+                  <span style={styles.handle}>@username</span>
+                </div>
+
+                <div style={styles.kpiRow}>
+                  <span style={styles.kpiLabel}>Total Keywords</span>
+                  <span style={styles.kpiValue}>
+                    {totalKeywords.toLocaleString("en-US")}
+                  </span>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* ---- KEYWORD TABLE ---- */}
+          <section style={{ marginTop: 18 }}>
+            <div style={styles.tableWrap}>
+              <div style={styles.tableHeaderRow}>
+                <span style={styles.tableTitle}>Keyword Breakdown</span>
+                {isAuthed && (
+                  <button
+                    style={styles.recalcBtn}
+                    onClick={handleClick}
+                    disabled={isLoading}
+                  >
+                    Recalculate
+                  </button>
+                )}
+              </div>
+
+              <table style={styles.table}>
+                <thead>
+                  <tr>
+                    <th style={styles.th}>Keyword</th>
+                    <th style={styles.thRight}>Total</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {KEYWORDS.map((row) => (
+                    <tr key={row.label}>
+                      <td style={styles.td}>{row.label}</td>
+                      <td style={styles.tdRight}>{row.total}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          </div>
-        </section>
+          </section>
+        </>
       )}
-
-      {/* ---- KEYWORD TABLE ---- */}
-      <section style={{ marginTop: 18 }}>
-        <div style={styles.tableWrap}>
-          <table style={styles.table}>
-            <thead>
-              <tr>
-                <th style={styles.th}>Keyword</th>
-                <th style={styles.thRight}>Total</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {KEYWORDS.map((row) => (
-                <tr key={row.label}>
-                  <td style={styles.td}>{row.label}</td>
-                  <td style={styles.tdRight}>{row.total}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
     </main>
   );
 }
@@ -183,6 +242,30 @@ const styles: Record<string, React.CSSProperties> = {
     boxShadow: "0 1px 6px rgba(0,0,0,0.04)",
   },
 
+  tableHeaderRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: "10px 14px",
+    borderBottom: "1px solid #e5e7eb",
+    background: "#f8fafc",
+  },
+
+  tableTitle: {
+    fontWeight: 600,
+    fontSize: 14,
+    color: "#0f172a",
+  },
+
+  recalcBtn: {
+    padding: "6px 10px",
+    borderRadius: 999,
+    border: "1px solid #e5e7eb",
+    background: "#ffffff",
+    fontSize: 12,
+    cursor: "pointer",
+  },
+
   table: {
     width: "100%",
     borderCollapse: "separate",
@@ -191,17 +274,17 @@ const styles: Record<string, React.CSSProperties> = {
 
   th: {
     textAlign: "left",
-    padding: "12px 14px",
+    padding: "10px 14px",
     fontWeight: 700,
-    background: "#f8fafc",
+    background: "#f9fafb",
     borderBottom: "1px solid #e5e7eb",
   },
 
   thRight: {
     textAlign: "right",
-    padding: "12px 14px",
+    padding: "10px 14px",
     fontWeight: 700,
-    background: "#f8fafc",
+    background: "#f9fafb",
     borderBottom: "1px solid #e5e7eb",
   },
 
@@ -215,5 +298,54 @@ const styles: Record<string, React.CSSProperties> = {
     textAlign: "right",
     fontWeight: 600,
     borderBottom: "1px solid #f1f5f9",
+  },
+
+  /* --- Skeleton styles --- */
+  skeletonCard: {
+    display: "flex",
+    alignItems: "center",
+    gap: 16,
+    marginTop: 32,
+    padding: 18,
+    borderRadius: 14,
+    background: "#f3f4f6",
+  },
+
+  skeletonAvatar: {
+    width: 64,
+    height: 64,
+    borderRadius: "50%",
+    background: "linear-gradient(90deg,#e5e7eb,#f3f4f6,#e5e7eb)",
+    backgroundSize: "200% 100%",
+    animation: "pulse 1.2s ease-in-out infinite",
+  },
+
+  skeletonLineWide: {
+    height: 16,
+    width: "60%",
+    borderRadius: 999,
+    marginBottom: 8,
+    background: "#e5e7eb",
+  },
+
+  skeletonLineNarrow: {
+    height: 12,
+    width: "40%",
+    borderRadius: 999,
+    background: "#e5e7eb",
+  },
+
+  skeletonTableHeader: {
+    height: 36,
+    borderRadius: 10,
+    background: "#e5e7eb",
+    marginBottom: 8,
+  },
+
+  skeletonTableRow: {
+    height: 32,
+    borderRadius: 8,
+    background: "#f3f4f6",
+    marginBottom: 6,
   },
 };

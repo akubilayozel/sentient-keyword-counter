@@ -1,27 +1,66 @@
 import { useState } from "react";
 import type React from "react";
 
-// --- UI CONFIG (placeholder data) ---
-const KEYWORDS: { label: string; total: number }[] = [
-  { label: "gsent", total: 100 },
-  { label: "Sentient", total: 50 },
-  { label: "Dobby", total: 20 },
-  { label: "GRID", total: 5 },
-  { label: "ROMA", total: 0 },
+type KeywordStat = { label: string; total: number };
+
+// Kelime label'ları (ekranda görünecek hâli)
+const KEYWORD_LABELS = ["gsent", "Sentient", "Dobby", "GRID", "ROMA"];
+
+// Şimdilik örnek tweet metinleri (ileride Twitter API'den gelecek)
+const SAMPLE_TWEETS: string[] = [
+  "gm gsent fam, building crazy stuff with Sentient today",
+  "Dobby is cooking something big for GRID and Sentient",
+  "I love the gsent community, gsent forever",
+  "ROMA search + Sentient = multi-step reasoning beast",
+  "No keyword in this tweet, just vibes",
 ];
+
+// Tweetler içinde substring olarak kelime sayan fonksiyon
+function countKeywordsInTweets(
+  tweets: string[],
+  labels: string[]
+): KeywordStat[] {
+  return labels.map((label) => {
+    const kw = label.toLowerCase();
+    let total = 0;
+
+    for (const raw of tweets) {
+      const text = raw.toLowerCase();
+      let idx = text.indexOf(kw);
+
+      // aynı tweette birden fazla geçişi de say
+      while (idx !== -1) {
+        total += 1;
+        idx = text.indexOf(kw, idx + kw.length);
+      }
+    }
+
+    return { label, total };
+  });
+}
 
 export default function Home() {
   const [isAuthed, setIsAuthed] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  const totalKeywords = KEYWORDS.reduce((s, k) => s + k.total, 0);
+  const [stats, setStats] = useState<KeywordStat[]>(
+    KEYWORD_LABELS.map((label) => ({ label, total: 0 }))
+  );
+
+  const totalKeywords = stats.reduce((s, k) => s + k.total, 0);
+
+  const runCalculation = () => {
+    // Burada ileride gerçek OAuth + Twitter API çağrısı olacak.
+    // Şimdilik sadece dummy tweetler üzerinde sayım yapıyoruz.
+    const newStats = countKeywordsInTweets(SAMPLE_TWEETS, KEYWORD_LABELS);
+    setStats(newStats);
+  };
 
   const handleClick = () => {
-    // burada ileride gerçek OAuth + API call olacak
     setIsLoading(true);
 
-    // şimdilik sadece fake bir loading simulasyonu
     setTimeout(() => {
+      runCalculation();
       setIsLoading(false);
       setIsAuthed(true);
     }, 900);
@@ -36,7 +75,8 @@ export default function Home() {
         <div style={styles.logoText}>Sentient</div>
 
         <p style={styles.tagline}>
-          Connect your X (Twitter) account. See how much you contribute to Sentient on X.
+          Connect your X (Twitter) account. See how much you contribute to
+          Sentient on X.
           <br />
           We count posts, replies, quotes and retweets containing{" "}
           <b>gsent, Sentient, Dobby, GRID, ROMA</b>.
@@ -125,7 +165,7 @@ export default function Home() {
                 </thead>
 
                 <tbody>
-                  {KEYWORDS.map((row) => (
+                  {stats.map((row) => (
                     <tr key={row.label}>
                       <td style={styles.td}>{row.label}</td>
                       <td style={styles.tdRight}>{row.total}</td>

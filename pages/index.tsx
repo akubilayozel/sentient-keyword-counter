@@ -6,6 +6,7 @@ type KeywordStat = { label: string; total: number };
 // Ekranda görünecek keyword label'ları
 const KEYWORD_LABELS = [
   "Sentient",
+  "GRID",
   "ROMA",
   "Dobby",
   "OML",
@@ -88,7 +89,7 @@ export default function Home() {
           <br />
           We count posts, replies, quotes and retweets containing{" "}
           <b>
-            Sentient, ROMA, Dobby, OML, Fingerprint, Loyal AI, gsent
+            Sentient, GRID, ROMA, Dobby, OML, Fingerprint, Loyal AI, gsent
           </b>
           .
         </p>

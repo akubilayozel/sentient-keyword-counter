@@ -3,15 +3,23 @@ import type React from "react";
 
 type KeywordStat = { label: string; total: number };
 
-// Kelime label'ları (ekranda görünecek hâli)
-const KEYWORD_LABELS = ["gsent", "Sentient", "Dobby", "GRID", "ROMA"];
+// Ekranda görünecek keyword label'ları
+const KEYWORD_LABELS = [
+  "Sentient",
+  "ROMA",
+  "Dobby",
+  "OML",
+  "Fingerprint",
+  "Loyal AI",
+  "gsent",
+];
 
 // Şimdilik örnek tweet metinleri (ileride Twitter API'den gelecek)
 const SAMPLE_TWEETS: string[] = [
-  "gm gsent fam, building crazy stuff with Sentient today",
-  "Dobby is cooking something big for GRID and Sentient",
-  "I love the gsent community, gsent forever",
-  "ROMA search + Sentient = multi-step reasoning beast",
+  "gm gsent fam, building crazy stuff with Sentient and ROMA today",
+  "Dobby is cooking something big for OML and Loyal AI",
+  "I love the Sentient community, gsent forever",
+  "Fingerprint tech + OML + Sentient = wild combo",
   "No keyword in this tweet, just vibes",
 ];
 
@@ -79,7 +87,10 @@ export default function Home() {
           Sentient on X.
           <br />
           We count posts, replies, quotes and retweets containing{" "}
-          <b>gsent, Sentient, Dobby, GRID, ROMA</b>.
+          <b>
+            Sentient, ROMA, Dobby, OML, Fingerprint, Loyal AI, gsent
+          </b>
+          .
         </p>
 
         <button

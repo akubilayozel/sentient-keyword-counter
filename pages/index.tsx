@@ -20,7 +20,7 @@ const SAMPLE_TWEETS: string[] = [
   "gm gsent fam, building crazy stuff with Sentient and ROMA today",
   "Dobby is cooking something big for OML and Loyal AI",
   "I love the Sentient community, gsent forever",
-  "Fingerprint tech + OML + Sentient = wild combo",
+  "Fingerprint tech + OML + GRID + Sentient = wild combo",
   "No keyword in this tweet, just vibes",
 ];
 

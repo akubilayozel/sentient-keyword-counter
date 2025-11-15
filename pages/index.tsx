@@ -6,7 +6,7 @@ type LeaderEntry = {
   id: string;
   name: string;
   handle: string;
-  avatarUrl?: string;
+  avatarUrl?: string; // data URL veya normal URL
   totalKeywords: number;
 };
 
@@ -34,7 +34,8 @@ export default function Home() {
   // Leaderboard için kullanıcı bilgileri
   const [displayName, setDisplayName] = useState<string>("");
   const [handle, setHandle] = useState<string>("");
-  const [avatarUrl, setAvatarUrl] = useState<string>("");
+  const [avatarFileName, setAvatarFileName] = useState<string>("");
+  const [avatarDataUrl, setAvatarDataUrl] = useState<string>("");
 
   const [leaderboard, setLeaderboard] = useState<LeaderEntry[]>([]);
 
@@ -50,6 +51,25 @@ export default function Home() {
     } else {
       setFileName("");
     }
+  }
+
+  function handleAvatarFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0] || null;
+    setAvatarDataUrl("");
+    setAvatarFileName("");
+
+    if (!f) return;
+
+    setAvatarFileName(f.name);
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result;
+      if (typeof result === "string") {
+        setAvatarDataUrl(result); // data URL olarak kaydediyoruz
+      }
+    };
+    reader.readAsDataURL(f);
   }
 
   function splitCsvLine(line: string): string[] {
@@ -170,7 +190,7 @@ export default function Home() {
         id,
         name: displayName || "Anonymous",
         handle: handle ? (handle.startsWith("@") ? handle : "@" + handle) : "",
-        avatarUrl: avatarUrl || undefined,
+        avatarUrl: avatarDataUrl || undefined, // upload ettiyse data URL, yoksa undefined
         totalKeywords: tk,
       };
 
@@ -231,11 +251,6 @@ export default function Home() {
       alignItems: "center",
       marginTop: 12,
     },
-    fileLabel: {
-      fontSize: 14,
-      fontWeight: 500,
-      color: "#374151",
-    },
     fileInput: {
       padding: "8px 0",
     },
@@ -248,13 +263,14 @@ export default function Home() {
       fontSize: 14,
       fontWeight: 600,
       cursor: "pointer",
-      marginTop: 8,
+      marginTop: 12,
     } as React.CSSProperties,
     smallInputRow: {
       display: "flex",
       flexWrap: "wrap" as const,
       gap: 12,
       marginTop: 16,
+      alignItems: "center",
     },
     textInput: {
       flex: "1 1 160px",
@@ -331,7 +347,7 @@ export default function Home() {
       width: 40,
       height: 40,
       borderRadius: "50%",
-      background: "#F97373",
+      background: "#2563EB",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
@@ -392,12 +408,34 @@ export default function Home() {
             value={handle}
             onChange={(e) => setHandle(e.target.value)}
           />
-          <input
-            style={styles.textInput}
-            placeholder="Avatar URL (optional)"
-            value={avatarUrl}
-            onChange={(e) => setAvatarUrl(e.target.value)}
-          />
+          <div>
+            <label
+              style={{
+                display: "block",
+                fontSize: 12,
+                color: "#6B7280",
+                marginBottom: 4,
+              }}
+            >
+              Avatar (optional)
+            </label>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleAvatarFileChange}
+            />
+            {avatarFileName && (
+              <div
+                style={{
+                  fontSize: 11,
+                  color: "#9CA3AF",
+                  marginTop: 2,
+                }}
+              >
+                {avatarFileName}
+              </div>
+            )}
+          </div>
         </div>
 
         <button
@@ -460,7 +498,13 @@ export default function Home() {
           >
             Leaderboard (this browser)
           </div>
-          <div style={{ fontSize: 12, color: "#9CA3AF", marginBottom: 8 }}>
+          <div
+            style={{
+              fontSize: 12,
+              color: "#9CA3AF",
+              marginBottom: 8,
+            }}
+          >
             Sorted by total keyword count. Each new archive you analyze updates
             your entry here.
           </div>

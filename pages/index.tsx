@@ -1,403 +1,516 @@
 import { useState } from "react";
-import type React from "react";
 
 type KeywordStat = { label: string; total: number };
 
-// Ekranda görünecek keyword label'ları
-const KEYWORD_LABELS = [
+type LeaderEntry = {
+  id: string;
+  name: string;
+  handle: string;
+  avatarUrl?: string;
+  totalKeywords: number;
+};
+
+const KEYWORDS = [
   "Sentient",
-  "GRID",
   "ROMA",
   "Dobby",
   "OML",
   "Fingerprint",
   "Loyal AI",
   "gsent",
+  "GRID",
 ];
-
-// Şimdilik örnek tweet metinleri (ileride Twitter API'den gelecek)
-const SAMPLE_TWEETS: string[] = [
-  "gm gsent fam, building crazy stuff with Sentient and ROMA today",
-  "Dobby is cooking something big for OML and Loyal AI",
-  "I love the Sentient community, gsent forever",
-  "Fingerprint tech + OML + GRID + Sentient = wild combo",
-  "No keyword in this tweet, just vibes",
-];
-
-// Tweetler içinde substring olarak kelime sayan fonksiyon
-function countKeywordsInTweets(
-  tweets: string[],
-  labels: string[]
-): KeywordStat[] {
-  return labels.map((label) => {
-    const kw = label.toLowerCase();
-    let total = 0;
-
-    for (const raw of tweets) {
-      const text = raw.toLowerCase();
-      let idx = text.indexOf(kw);
-
-      // aynı tweette birden fazla geçişi de say
-      while (idx !== -1) {
-        total += 1;
-        idx = text.indexOf(kw, idx + kw.length);
-      }
-    }
-
-    return { label, total };
-  });
-}
 
 export default function Home() {
-  const [isAuthed, setIsAuthed] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-
-  const [stats, setStats] = useState<KeywordStat[]>(
-    KEYWORD_LABELS.map((label) => ({ label, total: 0 }))
+  const [file, setFile] = useState<File | null>(null);
+  const [fileName, setFileName] = useState<string>("");
+  const [status, setStatus] = useState<"idle" | "parsing" | "done" | "error">(
+    "idle"
   );
+  const [error, setError] = useState<string | null>(null);
+  const [stats, setStats] = useState<KeywordStat[] | null>(null);
+  const [totalKeywords, setTotalKeywords] = useState<number>(0);
 
-  const totalKeywords = stats.reduce((s, k) => s + k.total, 0);
+  // Leaderboard için kullanıcı bilgileri
+  const [displayName, setDisplayName] = useState<string>("");
+  const [handle, setHandle] = useState<string>("");
+  const [avatarUrl, setAvatarUrl] = useState<string>("");
 
-  const runCalculation = () => {
-    // Burada ileride gerçek OAuth + Twitter API çağrısı olacak.
-    // Şimdilik sadece dummy tweetler üzerinde sayım yapıyoruz.
-    const newStats = countKeywordsInTweets(SAMPLE_TWEETS, KEYWORD_LABELS);
-    setStats(newStats);
+  const [leaderboard, setLeaderboard] = useState<LeaderEntry[]>([]);
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0] || null;
+    setFile(f);
+    setError(null);
+    setStats(null);
+    setTotalKeywords(0);
+
+    if (f) {
+      setFileName(f.name);
+    } else {
+      setFileName("");
+    }
+  }
+
+  function splitCsvLine(line: string): string[] {
+    // Virgülleri, tırnak içlerindeki virgülleri bozmadan ayırmak için basit regex
+    return line.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/);
+  }
+
+  async function analyzeArchive() {
+    if (!file) {
+      setError("Please choose a tweets.js or tweets.csv file first.");
+      return;
+    }
+
+    setStatus("parsing");
+    setError(null);
+
+    try {
+      const text = await file.text();
+      let tweets: string[] = [];
+
+      if (file.name.endsWith(".js")) {
+        // tweets.js → window.YTD.tweets.part0 = [ ... ];
+        const firstBracket = text.indexOf("[");
+        const lastBracket = text.lastIndexOf("]");
+
+        if (firstBracket === -1 || lastBracket === -1) {
+          throw new Error(
+            "Could not find JSON array in tweets.js. Please upload the original file from X."
+          );
+        }
+
+        const jsonArray = text.slice(firstBracket, lastBracket + 1);
+        const parsed = JSON.parse(jsonArray);
+
+        if (!Array.isArray(parsed)) {
+          throw new Error("Parsed tweets.js is not an array.");
+        }
+
+        for (const item of parsed) {
+          const t =
+            item?.tweet?.full_text ||
+            item?.tweet?.text ||
+            item?.full_text ||
+            item?.text;
+          if (typeof t === "string") {
+            tweets.push(t);
+          }
+        }
+      } else if (file.name.endsWith(".csv")) {
+        const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+        if (lines.length < 2) {
+          throw new Error("CSV file seems to be empty.");
+        }
+
+        const headerCols = splitCsvLine(lines[0]);
+        const textIndex = headerCols.findIndex((h) =>
+          /full_text|text/i.test(h)
+        );
+
+        if (textIndex === -1) {
+          throw new Error(
+            "Could not find a text/full_text column in CSV header."
+          );
+        }
+
+        for (let i = 1; i < lines.length; i++) {
+          const cols = splitCsvLine(lines[i]);
+          const t = cols[textIndex];
+          if (t && t.trim().length > 0) {
+            // Baş ve sondaki tırnakları temizle
+            let clean = t.trim();
+            if (clean.startsWith('"') && clean.endsWith('"')) {
+              clean = clean.slice(1, -1);
+            }
+            tweets.push(clean);
+          }
+        }
+      } else {
+        throw new Error("Please upload tweets.js or tweets.csv file.");
+      }
+
+      if (tweets.length === 0) {
+        throw new Error(
+          "We couldn’t detect tweets in this file. Please upload tweets.js or tweets.csv from your X archive."
+        );
+      }
+
+      // Keyword sayımı
+      const statsResult: KeywordStat[] = KEYWORDS.map((label) => {
+        const kw = label.toLowerCase();
+        let total = 0;
+
+        for (const raw of tweets) {
+          const txt = raw.toLowerCase();
+          let idx = txt.indexOf(kw);
+          while (idx !== -1) {
+            total += 1;
+            idx = txt.indexOf(kw, idx + kw.length);
+          }
+        }
+
+        return { label, total };
+      });
+
+      const tk = statsResult.reduce((s, k) => s + k.total, 0);
+
+      setStats(statsResult);
+      setTotalKeywords(tk);
+      setStatus("done");
+
+      // Leaderboard güncelle
+      const id =
+        (handle && handle.toLowerCase()) ||
+        (displayName && displayName.toLowerCase()) ||
+        "anonymous";
+
+      const entry: LeaderEntry = {
+        id,
+        name: displayName || "Anonymous",
+        handle: handle ? (handle.startsWith("@") ? handle : "@" + handle) : "",
+        avatarUrl: avatarUrl || undefined,
+        totalKeywords: tk,
+      };
+
+      setLeaderboard((prev) => {
+        const others = prev.filter((p) => p.id !== id);
+        const next = [...others, entry];
+        next.sort((a, b) => b.totalKeywords - a.totalKeywords);
+        return next;
+      });
+    } catch (err: any) {
+      console.error(err);
+      setStatus("error");
+      setError(
+        err?.message ||
+          "We couldn’t detect tweets in this file. Please upload tweets.js or tweets.csv from your X archive."
+      );
+    }
+  }
+
+  const styles = {
+    main: {
+      maxWidth: 960,
+      margin: "40px auto",
+      padding: "0 16px 40px",
+      fontFamily: "Inter, system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
+      color: "#111827",
+    } as React.CSSProperties,
+    title: {
+      fontSize: 40,
+      fontWeight: 800,
+      textAlign: "center" as const,
+      marginBottom: 8,
+    },
+    tagline: {
+      textAlign: "center" as const,
+      fontSize: 15,
+      color: "#4B5563",
+      marginBottom: 4,
+    },
+    tagline2: {
+      textAlign: "center" as const,
+      fontSize: 14,
+      color: "#6B7280",
+      marginBottom: 32,
+    },
+    uploadCard: {
+      background: "#FFFFFF",
+      borderRadius: 16,
+      padding: "20px 24px",
+      boxShadow: "0 12px 30px rgba(15,23,42,0.06)",
+      border: "1px solid #E5E7EB",
+      marginBottom: 24,
+    } as React.CSSProperties,
+    fileRow: {
+      display: "flex",
+      flexWrap: "wrap" as const,
+      gap: 12,
+      alignItems: "center",
+      marginTop: 12,
+    },
+    fileLabel: {
+      fontSize: 14,
+      fontWeight: 500,
+      color: "#374151",
+    },
+    fileInput: {
+      padding: "8px 0",
+    },
+    btnPrimary: {
+      background: "#2563EB",
+      color: "#FFFFFF",
+      border: "none",
+      borderRadius: 999,
+      padding: "10px 22px",
+      fontSize: 14,
+      fontWeight: 600,
+      cursor: "pointer",
+      marginTop: 8,
+    } as React.CSSProperties,
+    smallInputRow: {
+      display: "flex",
+      flexWrap: "wrap" as const,
+      gap: 12,
+      marginTop: 16,
+    },
+    textInput: {
+      flex: "1 1 160px",
+      minWidth: 0,
+      padding: "8px 10px",
+      borderRadius: 999,
+      border: "1px solid #E5E7EB",
+      fontSize: 13,
+    } as React.CSSProperties,
+    errorText: {
+      marginTop: 12,
+      fontSize: 13,
+      color: "#DC2626",
+    },
+    resultCard: {
+      background: "#FFFFFF",
+      borderRadius: 16,
+      padding: "16px 20px",
+      boxShadow: "0 10px 24px rgba(15,23,42,0.04)",
+      border: "1px solid #E5E7EB",
+      marginTop: 20,
+      marginBottom: 20,
+    } as React.CSSProperties,
+    totalLine: {
+      fontSize: 18,
+      fontWeight: 600,
+      color: "#111827",
+    },
+    tableCard: {
+      background: "#FFFFFF",
+      borderRadius: 16,
+      border: "1px solid #E5E7EB",
+      overflow: "hidden",
+    } as React.CSSProperties,
+    tableHeaderRow: {
+      background: "#F9FAFB",
+    } as React.CSSProperties,
+    th: {
+      textAlign: "left" as const,
+      padding: "10px 16px",
+      fontSize: 13,
+      fontWeight: 600,
+      color: "#6B7280",
+      borderBottom: "1px solid #E5E7EB",
+    },
+    td: {
+      padding: "10px 16px",
+      fontSize: 14,
+      color: "#111827",
+      borderBottom: "1px solid #F3F4F6",
+    },
+    leaderboardCard: {
+      background: "#FFFFFF",
+      borderRadius: 16,
+      border: "1px solid #E5E7EB",
+      padding: "16px 20px",
+      marginTop: 24,
+    } as React.CSSProperties,
+    lbRow: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      padding: "8px 0",
+      borderBottom: "1px solid #F3F4F6",
+    } as React.CSSProperties,
+    avatar: {
+      width: 40,
+      height: 40,
+      borderRadius: "50%",
+      objectFit: "cover" as const,
+      background: "#F9FAFB",
+    },
+    avatarFallback: {
+      width: 40,
+      height: 40,
+      borderRadius: "50%",
+      background: "#F97373",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      color: "#FFFFFF",
+      fontWeight: 700,
+    } as React.CSSProperties,
   };
-
-  const handleClick = () => {
-    setIsLoading(true);
-
-    setTimeout(() => {
-      runCalculation();
-      setIsLoading(false);
-      setIsAuthed(true);
-    }, 900);
-  };
-
-  const buttonLabel = isAuthed ? "Recalculate" : "Sign in with X";
 
   return (
     <main style={styles.main}>
-      {/* ---- SENTIENT LOGO / HERO ---- */}
-      <div style={styles.hero}>
-        <div style={styles.logoText}>Sentient</div>
+      <h1 style={styles.title}>Sentient Keyword Counter</h1>
+      <p style={styles.tagline}>
+        Download your data from X, upload the <b>tweets.js</b> or{" "}
+        <b>tweets.csv</b> file, and we’ll analyze your entire history for
+        Sentient-related keywords.
+      </p>
+      <p style={styles.tagline2}>
+        See how much you contribute to Sentient on X. We count posts, replies,
+        quotes and retweets containing <b>gsent</b>, <b>Sentient</b>,{" "}
+        <b>Dobby</b>, <b>GRID</b>, <b>ROMA</b>, <b>OML</b>, <b>Fingerprint</b>,{" "}
+        <b>Loyal AI</b>.
+      </p>
 
-        <p style={styles.tagline}>
-          Connect your X (Twitter) account. See how much you contribute to
-          Sentient on X.
-          <br />
-          We count posts, replies, quotes and retweets containing{" "}
-          <b>
-            Sentient, GRID, ROMA, Dobby, OML, Fingerprint, Loyal AI, gsent
-          </b>
-          .
+      {/* Upload card */}
+      <section style={styles.uploadCard}>
+        <div style={{ fontSize: 14, color: "#374151", fontWeight: 600 }}>
+          Upload your X archive file
+        </div>
+        <p style={{ fontSize: 13, color: "#6B7280", marginTop: 4 }}>
+          Use the <b>tweets.js</b> or <b>tweets.csv</b> file from your X archive
+          download. We only read tweet text in your browser; nothing is sent to
+          a server.
         </p>
 
-        <button
-          onClick={handleClick}
-          style={{
-            ...styles.signBtn,
-            opacity: isLoading ? 0.7 : 1,
-            cursor: isLoading ? "default" : "pointer",
-          }}
-          disabled={isLoading}
-        >
-          {isLoading ? "Calculating…" : buttonLabel}
-        </button>
-      </div>
-
-      {/* ---- LOADING SKELETON ---- */}
-      {isLoading ? (
-        <>
-          <section style={styles.skeletonCard}>
-            <div style={styles.skeletonAvatar} />
-            <div style={{ flex: 1 }}>
-              <div style={styles.skeletonLineWide} />
-              <div style={styles.skeletonLineNarrow} />
-            </div>
-          </section>
-
-          <section style={{ marginTop: 18 }}>
-            <div style={styles.skeletonTableHeader} />
-            <div style={styles.skeletonTableRow} />
-            <div style={styles.skeletonTableRow} />
-            <div style={styles.skeletonTableRow} />
-          </section>
-        </>
-      ) : (
-        <>
-          {/* ---- PROFILE CARD (mock, sadece sign-in sonrası) ---- */}
-          {isAuthed && (
-            <section style={styles.profileCard}>
-              <img
-                alt="Twitter Avatar"
-                src="https://unavatar.io/twitter/sentientagi"
-                style={styles.avatar}
-              />
-
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={styles.nameRow}>
-                  <span style={styles.displayName}>Kubilay</span>
-                  <span style={styles.handle}>@username</span>
-                </div>
-
-                <div style={styles.kpiRow}>
-                  <span style={styles.kpiLabel}>Total Keywords</span>
-                  <span style={styles.kpiValue}>
-                    {totalKeywords.toLocaleString("en-US")}
-                  </span>
-                </div>
-              </div>
-            </section>
+        <div style={styles.fileRow}>
+          <div style={styles.fileInput}>
+            <input
+              type="file"
+              accept=".js,.csv"
+              onChange={handleFileChange}
+            />
+          </div>
+          {fileName && (
+            <span style={{ fontSize: 13, color: "#4B5563" }}>{fileName}</span>
           )}
+        </div>
 
-          {/* ---- KEYWORD TABLE ---- */}
-          <section style={{ marginTop: 18 }}>
-            <div style={styles.tableWrap}>
-              <div style={styles.tableHeaderRow}>
-                <span style={styles.tableTitle}>Keyword Breakdown</span>
-                {isAuthed && (
-                  <button
-                    style={styles.recalcBtn}
-                    onClick={handleClick}
-                    disabled={isLoading}
-                  >
-                    Recalculate
-                  </button>
-                )}
-              </div>
+        <div style={styles.smallInputRow}>
+          <input
+            style={styles.textInput}
+            placeholder="Display name (for leaderboard)"
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
+          />
+          <input
+            style={styles.textInput}
+            placeholder="X handle (e.g. kubilay)"
+            value={handle}
+            onChange={(e) => setHandle(e.target.value)}
+          />
+          <input
+            style={styles.textInput}
+            placeholder="Avatar URL (optional)"
+            value={avatarUrl}
+            onChange={(e) => setAvatarUrl(e.target.value)}
+          />
+        </div>
 
-              <table style={styles.table}>
-                <thead>
-                  <tr>
-                    <th style={styles.th}>Keyword</th>
-                    <th style={styles.thRight}>Total</th>
-                  </tr>
-                </thead>
+        <button
+          type="button"
+          style={styles.btnPrimary}
+          onClick={analyzeArchive}
+          disabled={status === "parsing"}
+        >
+          {status === "parsing" ? "Parsing archive…" : "Analyze Archive"}
+        </button>
 
-                <tbody>
-                  {stats.map((row) => (
-                    <tr key={row.label}>
-                      <td style={styles.td}>{row.label}</td>
-                      <td style={styles.tdRight}>{row.total}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+        {error && <div style={styles.errorText}>{error}</div>}
+      </section>
+
+      {/* Result summary */}
+      {stats && (
+        <>
+          <section style={styles.resultCard}>
+            <div style={{ fontSize: 14, color: "#6B7280", marginBottom: 4 }}>
+              All-time summary
+            </div>
+            <div style={styles.totalLine}>
+              Total Keywords:{" "}
+              <span style={{ color: "#2563EB" }}>{totalKeywords}</span>
             </div>
           </section>
+
+          {/* Keyword breakdown table */}
+          <section style={styles.tableCard}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead style={styles.tableHeaderRow}>
+                <tr>
+                  <th style={styles.th}>Keyword</th>
+                  <th style={styles.th}>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stats.map((row) => (
+                  <tr key={row.label}>
+                    <td style={styles.td}>{row.label}</td>
+                    <td style={styles.td}>{row.total}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
         </>
+      )}
+
+      {/* Local leaderboard */}
+      {leaderboard.length > 0 && (
+        <section style={styles.leaderboardCard}>
+          <div
+            style={{
+              fontSize: 14,
+              fontWeight: 600,
+              color: "#374151",
+              marginBottom: 8,
+            }}
+          >
+            Leaderboard (this browser)
+          </div>
+          <div style={{ fontSize: 12, color: "#9CA3AF", marginBottom: 8 }}>
+            Sorted by total keyword count. Each new archive you analyze updates
+            your entry here.
+          </div>
+          {leaderboard.map((user, index) => (
+            <div key={user.id} style={styles.lbRow}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                {user.avatarUrl ? (
+                  <img
+                    src={user.avatarUrl}
+                    alt={user.name}
+                    style={styles.avatar}
+                  />
+                ) : (
+                  <div style={styles.avatarFallback}>
+                    {user.name.charAt(0).toUpperCase()}
+                  </div>
+                )}
+                <div>
+                  <div
+                    style={{
+                      fontSize: 14,
+                      fontWeight: 600,
+                      color: "#111827",
+                    }}
+                  >
+                    {index + 1}. {user.name}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: "#6B7280",
+                    }}
+                  >
+                    {user.handle}
+                  </div>
+                </div>
+              </div>
+              <div
+                style={{
+                  fontSize: 14,
+                  fontWeight: 600,
+                  color: "#2563EB",
+                }}
+              >
+                {user.totalKeywords}
+              </div>
+            </div>
+          ))}
+        </section>
       )}
     </main>
   );
 }
-
-/* ------------ INLINE CSS ------------ */
-
-const styles: Record<string, React.CSSProperties> = {
-  main: {
-    maxWidth: 920,
-    margin: "32px auto",
-    padding: "0 16px",
-    fontFamily:
-      "Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif",
-    color: "#0f172a",
-  },
-
-  hero: { textAlign: "center", marginBottom: 24 },
-
-  logoText: {
-    fontSize: 72,
-    lineHeight: 1,
-    fontWeight: 800,
-    letterSpacing: -1.2,
-  },
-
-  tagline: {
-    marginTop: 10,
-    fontSize: 16,
-    color: "#475569",
-  },
-
-  signBtn: {
-    marginTop: 20,
-    padding: "12px 22px",
-    borderRadius: 10,
-    border: "1px solid #1d4ed8",
-    background: "#2563eb",
-    color: "#fff",
-    fontWeight: 700,
-    fontSize: 16,
-    cursor: "pointer",
-    boxShadow: "0 6px 14px rgba(37,99,235,0.15)",
-  },
-
-  profileCard: {
-    display: "flex",
-    alignItems: "center",
-    gap: 16,
-    marginTop: 32,
-    padding: 18,
-    borderRadius: 14,
-    background: "#ffffff",
-    border: "1px solid #e5e7eb",
-    boxShadow: "0 1px 6px rgba(0,0,0,0.04)",
-  },
-
-  avatar: {
-    width: 64,
-    height: 64,
-    borderRadius: "50%",
-    objectFit: "cover",
-  },
-
-  nameRow: {
-    display: "flex",
-    alignItems: "baseline",
-    gap: 10,
-  },
-
-  displayName: {
-    fontSize: 18,
-    fontWeight: 700,
-  },
-
-  handle: {
-    fontSize: 14,
-    color: "#6b7280",
-  },
-
-  kpiRow: {
-    marginTop: 4,
-    display: "flex",
-    alignItems: "baseline",
-    gap: 8,
-  },
-
-  kpiLabel: {
-    fontSize: 12,
-    color: "#6b7280",
-    letterSpacing: 0.3,
-  },
-
-  kpiValue: {
-    fontSize: 22,
-    fontWeight: 800,
-  },
-
-  tableWrap: {
-    borderRadius: 12,
-    overflow: "hidden",
-    border: "1px solid #e5e7eb",
-    background: "#fff",
-    boxShadow: "0 1px 6px rgba(0,0,0,0.04)",
-  },
-
-  tableHeaderRow: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: "10px 14px",
-    borderBottom: "1px solid #e5e7eb",
-    background: "#f8fafc",
-  },
-
-  tableTitle: {
-    fontWeight: 600,
-    fontSize: 14,
-    color: "#0f172a",
-  },
-
-  recalcBtn: {
-    padding: "6px 10px",
-    borderRadius: 999,
-    border: "1px solid #e5e7eb",
-    background: "#ffffff",
-    fontSize: 12,
-    cursor: "pointer",
-  },
-
-  table: {
-    width: "100%",
-    borderCollapse: "separate",
-    borderSpacing: 0,
-  },
-
-  th: {
-    textAlign: "left",
-    padding: "10px 14px",
-    fontWeight: 700,
-    background: "#f9fafb",
-    borderBottom: "1px solid #e5e7eb",
-  },
-
-  thRight: {
-    textAlign: "right",
-    padding: "10px 14px",
-    fontWeight: 700,
-    background: "#f9fafb",
-    borderBottom: "1px solid #e5e7eb",
-  },
-
-  td: {
-    padding: "12px 14px",
-    borderBottom: "1px solid #f1f5f9",
-  },
-
-  tdRight: {
-    padding: "12px 14px",
-    textAlign: "right",
-    fontWeight: 600,
-    borderBottom: "1px solid #f1f5f9",
-  },
-
-  /* --- Skeleton styles --- */
-  skeletonCard: {
-    display: "flex",
-    alignItems: "center",
-    gap: 16,
-    marginTop: 32,
-    padding: 18,
-    borderRadius: 14,
-    background: "#f3f4f6",
-  },
-
-  skeletonAvatar: {
-    width: 64,
-    height: 64,
-    borderRadius: "50%",
-    background: "linear-gradient(90deg,#e5e7eb,#f3f4f6,#e5e7eb)",
-    backgroundSize: "200% 100%",
-    animation: "pulse 1.2s ease-in-out infinite",
-  },
-
-  skeletonLineWide: {
-    height: 16,
-    width: "60%",
-    borderRadius: 999,
-    marginBottom: 8,
-    background: "#e5e7eb",
-  },
-
-  skeletonLineNarrow: {
-    height: 12,
-    width: "40%",
-    borderRadius: 999,
-    background: "#e5e7eb",
-  },
-
-  skeletonTableHeader: {
-    height: 36,
-    borderRadius: 10,
-    background: "#e5e7eb",
-    marginBottom: 8,
-  },
-
-  skeletonTableRow: {
-    height: 32,
-    borderRadius: 8,
-    background: "#f3f4f6",
-    marginBottom: 6,
-  },
-};

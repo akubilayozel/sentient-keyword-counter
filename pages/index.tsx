@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 
 type KeywordStat = { label: string; total: number };
 
@@ -8,7 +8,6 @@ type LeaderEntry = {
   handle: string;
   avatarUrl?: string; // data URL veya normal URL
   totalKeywords: number;
-  lastUpdated: string; // ISO tarih
 };
 
 const KEYWORDS = [
@@ -21,8 +20,6 @@ const KEYWORDS = [
   "gsent",
   "GRID",
 ];
-
-const LEADERBOARD_STORAGE_KEY = "sentient_keyword_counter_leaderboard_v1";
 
 export default function Home() {
   const [file, setFile] = useState<File | null>(null);
@@ -40,29 +37,7 @@ export default function Home() {
   const [avatarFileName, setAvatarFileName] = useState<string>("");
   const [avatarDataUrl, setAvatarDataUrl] = useState<string>("");
 
-  // Leaderboard: localStorage'dan lazy-load
-  const [leaderboard, setLeaderboard] = useState<LeaderEntry[]>(() => {
-    if (typeof window === "undefined") return [];
-    try {
-      const raw = window.localStorage.getItem(LEADERBOARD_STORAGE_KEY);
-      return raw ? (JSON.parse(raw) as LeaderEntry[]) : [];
-    } catch {
-      return [];
-    }
-  });
-
-  // Leaderboard değiştiğinde localStorage'a yaz
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      window.localStorage.setItem(
-        LEADERBOARD_STORAGE_KEY,
-        JSON.stringify(leaderboard)
-      );
-    } catch {
-      // sessizce yut, UI çalışmaya devam etsin
-    }
-  }, [leaderboard]);
+  const [leaderboard, setLeaderboard] = useState<LeaderEntry[]>([]);
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0] || null;
@@ -205,26 +180,18 @@ export default function Home() {
       setTotalKeywords(tk);
       setStatus("done");
 
-      // Leaderboard güncelle (aynı handle varsa entry'yi güncelle)
-      const normalizedHandle = handle ? handle.toLowerCase() : "";
+      // Leaderboard güncelle (aynı id varsa güncelleyip tekrar sırala)
       const id =
-        (normalizedHandle && `@${normalizedHandle.replace(/^@/, "")}`) ||
+        (handle && handle.toLowerCase()) ||
         (displayName && displayName.toLowerCase()) ||
         "anonymous";
-
-      const nowIso = new Date().toISOString();
 
       const entry: LeaderEntry = {
         id,
         name: displayName || "Anonymous",
-        handle: handle
-          ? handle.startsWith("@")
-            ? handle
-            : "@" + handle
-          : "",
-        avatarUrl: avatarDataUrl || undefined, // upload ettiyse data URL, yoksa undefined
+        handle: handle ? (handle.startsWith("@") ? handle : "@" + handle) : "",
+        avatarUrl: avatarDataUrl || undefined,
         totalKeywords: tk,
-        lastUpdated: nowIso,
       };
 
       setLeaderboard((prev) => {
@@ -336,7 +303,7 @@ export default function Home() {
     tableCard: {
       background: "#FFFFFF",
       borderRadius: 16,
-      border: "1px solid #E5E7EB",
+      border: "1px solid "#E5E7EB",
       overflow: "hidden",
     },
     tableHeaderRow: {
@@ -388,23 +355,7 @@ export default function Home() {
       color: "#FFFFFF",
       fontWeight: 700,
     },
-    lbMeta: {
-      fontSize: 12,
-      color: "#9CA3AF",
-    },
-    footer: {
-      marginTop: 32,
-      fontSize: 12,
-      color: "#9CA3AF",
-      textAlign: "center" as const,
-    },
-    footerLink: {
-      color: "#2563EB",
-      textDecoration: "none",
-      fontWeight: 600,
-      marginLeft: 4,
-    },
-  };
+  } as const;
 
   return (
     <main style={styles.main}>
@@ -427,7 +378,7 @@ export default function Home() {
           Upload your X archive file
         </div>
 
-        {/* Yeni açıklama metni */}
+        {/* Yardım metinleri */}
         <p style={{ fontSize: 13, color: "#6B7280", marginTop: 4 }}>
           <strong>How to download your X archive?</strong>
           <br />
@@ -603,12 +554,6 @@ export default function Home() {
                   >
                     {user.handle}
                   </div>
-                  {user.lastUpdated && (
-                    <div style={styles.lbMeta}>
-                      Last updated:{" "}
-                      {new Date(user.lastUpdated).toLocaleDateString()}
-                    </div>
-                  )}
                 </div>
               </div>
               <div
@@ -624,18 +569,6 @@ export default function Home() {
           ))}
         </section>
       )}
-
-      <footer style={styles.footer}>
-        <span>Built by</span>
-        <a
-          href="https://x.com/avaxcrypto"
-          target="_blank"
-          rel="noreferrer"
-          style={styles.footerLink}
-        >
-          kubilavax (@avaxcrypto)
-        </a>
-      </footer>
     </main>
   );
 }

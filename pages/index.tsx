@@ -303,7 +303,7 @@ export default function Home() {
     tableCard: {
       background: "#FFFFFF",
       borderRadius: 16,
-      border: "1px solid "#E5E7EB",
+      border: "1px solid #E5E7EB",
       overflow: "hidden",
     } as any, // küçük hack, istersen as any'yi kaldırabilirsin
     tableHeaderRow: {

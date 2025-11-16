@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
 type KeywordStat = { label: string; total: number };
 
@@ -8,6 +8,7 @@ type LeaderEntry = {
   handle: string;
   avatarUrl?: string; // data URL veya normal URL
   totalKeywords: number;
+  lastUpdated: string; // ISO tarih
 };
 
 const KEYWORDS = [
@@ -20,6 +21,8 @@ const KEYWORDS = [
   "gsent",
   "GRID",
 ];
+
+const LEADERBOARD_STORAGE_KEY = "sentient_keyword_counter_leaderboard_v1";
 
 export default function Home() {
   const [file, setFile] = useState<File | null>(null);
@@ -37,7 +40,29 @@ export default function Home() {
   const [avatarFileName, setAvatarFileName] = useState<string>("");
   const [avatarDataUrl, setAvatarDataUrl] = useState<string>("");
 
-  const [leaderboard, setLeaderboard] = useState<LeaderEntry[]>([]);
+  // Leaderboard: localStorage'dan lazy-load
+  const [leaderboard, setLeaderboard] = useState<LeaderEntry[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const raw = window.localStorage.getItem(LEADERBOARD_STORAGE_KEY);
+      return raw ? (JSON.parse(raw) as LeaderEntry[]) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  // Leaderboard değiştiğinde localStorage'a yaz
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(
+        LEADERBOARD_STORAGE_KEY,
+        JSON.stringify(leaderboard)
+      );
+    } catch {
+      // sessizce yut, UI çalışmaya devam etsin
+    }
+  }, [leaderboard]);
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0] || null;
@@ -180,18 +205,26 @@ export default function Home() {
       setTotalKeywords(tk);
       setStatus("done");
 
-      // Leaderboard güncelle
+      // Leaderboard güncelle (aynı handle varsa entry'yi güncelle)
+      const normalizedHandle = handle ? handle.toLowerCase() : "";
       const id =
-        (handle && handle.toLowerCase()) ||
+        (normalizedHandle && `@${normalizedHandle.replace(/^@/, "")}`) ||
         (displayName && displayName.toLowerCase()) ||
         "anonymous";
+
+      const nowIso = new Date().toISOString();
 
       const entry: LeaderEntry = {
         id,
         name: displayName || "Anonymous",
-        handle: handle ? (handle.startsWith("@") ? handle : "@" + handle) : "",
+        handle: handle
+          ? handle.startsWith("@")
+            ? handle
+            : "@" + handle
+          : "",
         avatarUrl: avatarDataUrl || undefined, // upload ettiyse data URL, yoksa undefined
         totalKeywords: tk,
+        lastUpdated: nowIso,
       };
 
       setLeaderboard((prev) => {
@@ -305,7 +338,7 @@ export default function Home() {
       borderRadius: 16,
       border: "1px solid #E5E7EB",
       overflow: "hidden",
-    } as any, // küçük hack, istersen as any'yi kaldırabilirsin
+    },
     tableHeaderRow: {
       background: "#F9FAFB",
     },
@@ -355,6 +388,22 @@ export default function Home() {
       color: "#FFFFFF",
       fontWeight: 700,
     },
+    lbMeta: {
+      fontSize: 12,
+      color: "#9CA3AF",
+    },
+    footer: {
+      marginTop: 32,
+      fontSize: 12,
+      color: "#9CA3AF",
+      textAlign: "center" as const,
+    },
+    footerLink: {
+      color: "#2563EB",
+      textDecoration: "none",
+      fontWeight: 600,
+      marginLeft: 4,
+    },
   };
 
   return (
@@ -402,11 +451,7 @@ export default function Home() {
 
         <div style={styles.fileRow}>
           <div style={styles.fileInput}>
-            <input
-              type="file"
-              accept=".js,.csv"
-              onChange={handleFileChange}
-            />
+            <input type="file" accept=".js,.csv" onChange={handleFileChange} />
           </div>
           {fileName && (
             <span style={{ fontSize: 13, color: "#4B5563" }}>{fileName}</span>
@@ -558,6 +603,12 @@ export default function Home() {
                   >
                     {user.handle}
                   </div>
+                  {user.lastUpdated && (
+                    <div style={styles.lbMeta}>
+                      Last updated:{" "}
+                      {new Date(user.lastUpdated).toLocaleDateString()}
+                    </div>
+                  )}
                 </div>
               </div>
               <div
@@ -573,6 +624,18 @@ export default function Home() {
           ))}
         </section>
       )}
+
+      <footer style={styles.footer}>
+        <span>Built by</span>
+        <a
+          href="https://x.com/avaxcrypto"
+          target="_blank"
+          rel="noreferrer"
+          style={styles.footerLink}
+        >
+          kubilavax (@avaxcrypto)
+        </a>
+      </footer>
     </main>
   );
 }

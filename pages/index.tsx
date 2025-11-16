@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import type React from "react";
 
 type KeywordStat = { label: string; total: number };
 
@@ -8,6 +9,7 @@ type LeaderEntry = {
   handle: string;
   avatarUrl?: string; // data URL veya normal URL
   totalKeywords: number;
+  uploadDate?: string; // ISO string
 };
 
 const KEYWORDS = [
@@ -20,6 +22,8 @@ const KEYWORDS = [
   "gsent",
   "GRID",
 ];
+
+const LEADERBOARD_STORAGE_KEY = "sentientKeywordCounter_leaderboard";
 
 export default function Home() {
   const [file, setFile] = useState<File | null>(null);
@@ -38,6 +42,35 @@ export default function Home() {
   const [avatarDataUrl, setAvatarDataUrl] = useState<string>("");
 
   const [leaderboard, setLeaderboard] = useState<LeaderEntry[]>([]);
+
+  // İlk yüklemede localStorage'dan leaderboard'u al
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = window.localStorage.getItem(LEADERBOARD_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as LeaderEntry[];
+        if (Array.isArray(parsed)) {
+          setLeaderboard(parsed);
+        }
+      }
+    } catch (e) {
+      console.error("Failed to load leaderboard from localStorage:", e);
+    }
+  }, []);
+
+  // Leaderboard her değiştiğinde localStorage'a yaz
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(
+        LEADERBOARD_STORAGE_KEY,
+        JSON.stringify(leaderboard)
+      );
+    } catch (e) {
+      console.error("Failed to save leaderboard to localStorage:", e);
+    }
+  }, [leaderboard]);
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0] || null;
@@ -75,6 +108,22 @@ export default function Home() {
   function splitCsvLine(line: string): string[] {
     // Virgülleri, tırnak içlerindeki virgülleri bozmadan ayırmak için basit regex
     return line.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/);
+  }
+
+  function formatUploadDate(iso?: string): string {
+    if (!iso) return "";
+    try {
+      const d = new Date(iso);
+      return d.toLocaleString(undefined, {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch {
+      return iso;
+    }
   }
 
   async function analyzeArchive() {
@@ -181,20 +230,28 @@ export default function Home() {
       setStatus("done");
 
       // Leaderboard güncelle
+      const normalizedHandle = handle
+        ? handle.startsWith("@")
+          ? handle.toLowerCase()
+          : "@" + handle.toLowerCase()
+        : "";
+
       const id =
-        (handle && handle.toLowerCase()) ||
+        normalizedHandle ||
         (displayName && displayName.toLowerCase()) ||
         "anonymous";
 
       const entry: LeaderEntry = {
         id,
         name: displayName || "Anonymous",
-        handle: handle ? (handle.startsWith("@") ? handle : "@" + handle) : "",
+        handle: normalizedHandle || "",
         avatarUrl: avatarDataUrl || undefined, // upload ettiyse data URL, yoksa undefined
-        totalKeywords: tk,
+        totalKeywords: tk, // full arşivden gelen güncel total
+        uploadDate: new Date().toISOString(),
       };
 
       setLeaderboard((prev) => {
+        // Aynı id'ye sahip eski kaydı çıkar, yenisini ekle → update
         const others = prev.filter((p) => p.id !== id);
         const next = [...others, entry];
         next.sort((a, b) => b.totalKeywords - a.totalKeywords);
@@ -215,7 +272,8 @@ export default function Home() {
       maxWidth: 960,
       margin: "40px auto",
       padding: "0 16px 40px",
-      fontFamily: "Inter, system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
+      fontFamily:
+        "Inter, system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
       color: "#111827",
     } as React.CSSProperties,
     title: {
@@ -325,7 +383,7 @@ export default function Home() {
     leaderboardCard: {
       background: "#FFFFFF",
       borderRadius: 16,
-      border: "1px solid #E5E7EB",
+      border: "1px solid "#E5E7EB",
       padding: "16px 20px",
       marginTop: 24,
     } as React.CSSProperties,
@@ -354,6 +412,12 @@ export default function Home() {
       color: "#FFFFFF",
       fontWeight: 700,
     } as React.CSSProperties,
+    footer: {
+      marginTop: 32,
+      fontSize: 12,
+      color: "#9CA3AF",
+      textAlign: "center" as const,
+    } as React.CSSProperties,
   };
 
   return (
@@ -377,7 +441,7 @@ export default function Home() {
           Upload your X archive file
         </div>
 
-        {/* Yeni açıklama metni */}
+        {/* Archive instructions */}
         <p style={{ fontSize: 13, color: "#6B7280", marginTop: 4 }}>
           <strong>How to download your X archive?</strong>
           <br />
@@ -557,6 +621,17 @@ export default function Home() {
                   >
                     {user.handle}
                   </div>
+                  {user.uploadDate && (
+                    <div
+                      style={{
+                        fontSize: 11,
+                        color: "#9CA3AF",
+                        marginTop: 2,
+                      }}
+                    >
+                      Last upload: {formatUploadDate(user.uploadDate)}
+                    </div>
+                  )}
                 </div>
               </div>
               <div
@@ -572,6 +647,10 @@ export default function Home() {
           ))}
         </section>
       )}
+
+      <footer style={styles.footer}>
+        Developed by <strong>kubilavax</strong> (<span>@avaxcrypto</span>)
+      </footer>
     </main>
   );
 }

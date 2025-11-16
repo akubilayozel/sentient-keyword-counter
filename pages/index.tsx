@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import type React from "react";
 
 type KeywordStat = { label: string; total: number };
 
@@ -7,9 +6,9 @@ type LeaderEntry = {
   id: string;
   name: string;
   handle: string;
-  avatarUrl?: string; // data URL veya normal URL
+  avatarUrl?: string;
   totalKeywords: number;
-  uploadDate?: string; // ISO string
+  date: string;
 };
 
 const KEYWORDS = [
@@ -23,247 +22,168 @@ const KEYWORDS = [
   "GRID",
 ];
 
-const LEADERBOARD_STORAGE_KEY = "sentientKeywordCounter_leaderboard";
-
 export default function Home() {
   const [file, setFile] = useState<File | null>(null);
-  const [fileName, setFileName] = useState<string>("");
+  const [fileName, setFileName] = useState("");
   const [status, setStatus] = useState<"idle" | "parsing" | "done" | "error">(
     "idle"
   );
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState<KeywordStat[] | null>(null);
-  const [totalKeywords, setTotalKeywords] = useState<number>(0);
+  const [totalKeywords, setTotalKeywords] = useState(0);
 
-  // Leaderboard için kullanıcı bilgileri
-  const [displayName, setDisplayName] = useState<string>("");
-  const [handle, setHandle] = useState<string>("");
-  const [avatarFileName, setAvatarFileName] = useState<string>("");
-  const [avatarDataUrl, setAvatarDataUrl] = useState<string>("");
+  // User info
+  const [displayName, setDisplayName] = useState("");
+  const [handle, setHandle] = useState("");
+  const [avatarFileName, setAvatarFileName] = useState("");
+  const [avatarDataUrl, setAvatarDataUrl] = useState("");
 
+  // Leaderboard
   const [leaderboard, setLeaderboard] = useState<LeaderEntry[]>([]);
 
-  // İlk yüklemede localStorage'dan leaderboard'u al
+  // Load leaderboard on mount
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      const raw = window.localStorage.getItem(LEADERBOARD_STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as LeaderEntry[];
-        if (Array.isArray(parsed)) {
-          setLeaderboard(parsed);
-        }
-      }
-    } catch (e) {
-      console.error("Failed to load leaderboard from localStorage:", e);
+    const saved = localStorage.getItem("sentient_leaderboard");
+    if (saved) {
+      try {
+        setLeaderboard(JSON.parse(saved));
+      } catch {}
     }
   }, []);
 
-  // Leaderboard her değiştiğinde localStorage'a yaz
+  // Save leaderboard
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      window.localStorage.setItem(
-        LEADERBOARD_STORAGE_KEY,
-        JSON.stringify(leaderboard)
-      );
-    } catch (e) {
-      console.error("Failed to save leaderboard to localStorage:", e);
-    }
+    localStorage.setItem("sentient_leaderboard", JSON.stringify(leaderboard));
   }, [leaderboard]);
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0] || null;
     setFile(f);
+    setFileName(f ? f.name : "");
     setError(null);
     setStats(null);
-    setTotalKeywords(0);
-
-    if (f) {
-      setFileName(f.name);
-    } else {
-      setFileName("");
-    }
   }
 
   function handleAvatarFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0] || null;
-    setAvatarDataUrl("");
-    setAvatarFileName("");
-
+    const f = e.target.files?.[0];
     if (!f) return;
-
     setAvatarFileName(f.name);
 
     const reader = new FileReader();
     reader.onload = () => {
-      const result = reader.result;
-      if (typeof result === "string") {
-        setAvatarDataUrl(result); // data URL olarak kaydediyoruz
+      if (typeof reader.result === "string") {
+        setAvatarDataUrl(reader.result);
       }
     };
     reader.readAsDataURL(f);
   }
 
-  function splitCsvLine(line: string): string[] {
-    // Virgülleri, tırnak içlerindeki virgülleri bozmadan ayırmak için basit regex
+  function splitCsvLine(line: string) {
     return line.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/);
   }
 
-  function formatUploadDate(iso?: string): string {
-    if (!iso) return "";
-    try {
-      const d = new Date(iso);
-      return d.toLocaleString(undefined, {
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-    } catch {
-      return iso;
-    }
-  }
-
   async function analyzeArchive() {
-    if (!file) {
-      setError("Please choose a tweets.js or tweets.csv file first.");
-      return;
-    }
+    if (!file) return setError("Please choose a tweets.js or tweets.csv file.");
 
     setStatus("parsing");
     setError(null);
 
     try {
-      const text = await file.text();
+      const raw = await file.text();
       let tweets: string[] = [];
 
+      // ---------------------------
+      // Parse tweets.js
+      // ---------------------------
       if (file.name.endsWith(".js")) {
-        // tweets.js → window.YTD.tweets.part0 = [ ... ];
-        const firstBracket = text.indexOf("[");
-        const lastBracket = text.lastIndexOf("]");
+        const i1 = raw.indexOf("[");
+        const i2 = raw.lastIndexOf("]");
+        if (i1 === -1 || i2 === -1) throw new Error("Invalid tweets.js format");
 
-        if (firstBracket === -1 || lastBracket === -1) {
-          throw new Error(
-            "Could not find JSON array in tweets.js. Please upload the original file from X."
-          );
+        const arr = JSON.parse(raw.slice(i1, i2 + 1));
+        for (const t of arr) {
+          const txt =
+            t?.tweet?.full_text ||
+            t?.tweet?.text ||
+            t?.full_text ||
+            t?.text;
+          if (typeof txt === "string") tweets.push(txt);
         }
+      }
 
-        const jsonArray = text.slice(firstBracket, lastBracket + 1);
-        const parsed = JSON.parse(jsonArray);
-
-        if (!Array.isArray(parsed)) {
-          throw new Error("Parsed tweets.js is not an array.");
-        }
-
-        for (const item of parsed) {
-          const t =
-            item?.tweet?.full_text ||
-            item?.tweet?.text ||
-            item?.full_text ||
-            item?.text;
-          if (typeof t === "string") {
-            tweets.push(t);
-          }
-        }
-      } else if (file.name.endsWith(".csv")) {
-        const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
-        if (lines.length < 2) {
-          throw new Error("CSV file seems to be empty.");
-        }
-
-        const headerCols = splitCsvLine(lines[0]);
-        const textIndex = headerCols.findIndex((h) =>
-          /full_text|text/i.test(h)
-        );
-
-        if (textIndex === -1) {
-          throw new Error(
-            "Could not find a text/full_text column in CSV header."
-          );
-        }
+      // ---------------------------
+      // Parse tweets.csv
+      // ---------------------------
+      else if (file.name.endsWith(".csv")) {
+        const lines = raw.split(/\r?\n/).filter((l) => l.trim() !== "");
+        const header = splitCsvLine(lines[0]);
+        const ti = header.findIndex((h) => /text|full_text/i.test(h));
+        if (ti === -1) throw new Error("No text/full_text column found");
 
         for (let i = 1; i < lines.length; i++) {
-          const cols = splitCsvLine(lines[i]);
-          const t = cols[textIndex];
-          if (t && t.trim().length > 0) {
-            // Baş ve sondaki tırnakları temizle
-            let clean = t.trim();
-            if (clean.startsWith('"') && clean.endsWith('"')) {
-              clean = clean.slice(1, -1);
-            }
-            tweets.push(clean);
+          let c = splitCsvLine(lines[i]);
+          let txt = c[ti];
+          if (txt) {
+            txt = txt.replace(/^"/, "").replace(/"$/, "");
+            tweets.push(txt);
           }
         }
       } else {
-        throw new Error("Please upload tweets.js or tweets.csv file.");
+        throw new Error("Upload tweets.js or tweets.csv only.");
       }
 
-      if (tweets.length === 0) {
-        throw new Error(
-          "We couldn’t detect tweets in this file. Please upload tweets.js or tweets.csv from your X archive."
-        );
-      }
+      if (!tweets.length) throw new Error("No tweets detected.");
 
-      // Keyword sayımı (case-insensitive, substring)
-      const statsResult: KeywordStat[] = KEYWORDS.map((label) => {
+      // ---------------------------
+      // Count Keywords
+      // ---------------------------
+      const statsResult = KEYWORDS.map((label) => {
         const kw = label.toLowerCase();
         let total = 0;
 
-        for (const raw of tweets) {
-          const txt = raw.toLowerCase();
+        for (const tweet of tweets) {
+          const txt = tweet.toLowerCase();
           let idx = txt.indexOf(kw);
           while (idx !== -1) {
-            total += 1;
+            total++;
             idx = txt.indexOf(kw, idx + kw.length);
           }
         }
-
         return { label, total };
       });
 
-      const tk = statsResult.reduce((s, k) => s + k.total, 0);
+      const tk = statsResult.reduce((a, b) => a + b.total, 0);
 
       setStats(statsResult);
       setTotalKeywords(tk);
       setStatus("done");
 
-      // Leaderboard güncelle
-      const normalizedHandle = handle
-        ? handle.startsWith("@")
-          ? handle.toLowerCase()
-          : "@" + handle.toLowerCase()
-        : "";
-
+      // ---------------------------
+      // Leaderboard update
+      // ---------------------------
       const id =
-        normalizedHandle ||
-        (displayName && displayName.toLowerCase()) ||
+        (handle || displayName)?.trim().toLowerCase().replace("@", "") ||
         "anonymous";
 
-      const entry: LeaderEntry = {
+      const newEntry: LeaderEntry = {
         id,
         name: displayName || "Anonymous",
-        handle: normalizedHandle || "",
-        avatarUrl: avatarDataUrl || undefined, // upload ettiyse data URL, yoksa undefined
-        totalKeywords: tk, // full arşivden gelen güncel total
-        uploadDate: new Date().toISOString(),
+        handle: handle ? (handle.startsWith("@") ? handle : "@" + handle) : "",
+        avatarUrl: avatarDataUrl || undefined,
+        totalKeywords: tk,
+        date: new Date().toLocaleString(),
       };
 
       setLeaderboard((prev) => {
-        // Aynı id'ye sahip eski kaydı çıkar, yenisini ekle → update
-        const others = prev.filter((p) => p.id !== id);
-        const next = [...others, entry];
-        next.sort((a, b) => b.totalKeywords - a.totalKeywords);
+        const others = prev.filter((x) => x.id !== id);
+        const next = [...others, newEntry].sort(
+          (a, b) => b.totalKeywords - a.totalKeywords
+        );
         return next;
       });
     } catch (err: any) {
-      console.error(err);
       setStatus("error");
-      setError(
-        err?.message ||
-          "We couldn’t detect tweets in this file. Please upload tweets.js or tweets.csv from your X archive."
-      );
+      setError(err.message || "Parsing error");
     }
   }
 
@@ -272,15 +192,13 @@ export default function Home() {
       maxWidth: 960,
       margin: "40px auto",
       padding: "0 16px 40px",
-      fontFamily:
-        "Inter, system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
+      fontFamily: "Inter, sans-serif",
       color: "#111827",
-    } as React.CSSProperties,
+    },
     title: {
       fontSize: 40,
       fontWeight: 800,
       textAlign: "center" as const,
-      marginBottom: 8,
     },
     tagline: {
       textAlign: "center" as const,
@@ -294,14 +212,17 @@ export default function Home() {
       color: "#6B7280",
       marginBottom: 32,
     },
+
+    // Upload Card
     uploadCard: {
-      background: "#FFFFFF",
+      background: "#FFF",
       borderRadius: 16,
       padding: "20px 24px",
       boxShadow: "0 12px 30px rgba(15,23,42,0.06)",
       border: "1px solid #E5E7EB",
       marginBottom: 24,
-    } as React.CSSProperties,
+    },
+
     fileRow: {
       display: "flex",
       flexWrap: "wrap" as const,
@@ -309,27 +230,19 @@ export default function Home() {
       alignItems: "center",
       marginTop: 12,
     },
-    fileInput: {
-      padding: "8px 0",
-    },
+
     btnPrimary: {
       background: "#2563EB",
-      color: "#FFFFFF",
-      border: "none",
-      borderRadius: 999,
+      color: "#FFF",
       padding: "10px 22px",
-      fontSize: 14,
-      fontWeight: 600,
+      borderRadius: 999,
+      border: "none",
       cursor: "pointer",
       marginTop: 12,
-    } as React.CSSProperties,
-    smallInputRow: {
-      display: "flex",
-      flexWrap: "wrap" as const,
-      gap: 12,
-      marginTop: 16,
-      alignItems: "center",
+      fontSize: 14,
+      fontWeight: 600,
     },
+
     textInput: {
       flex: "1 1 160px",
       minWidth: 0,
@@ -337,227 +250,161 @@ export default function Home() {
       borderRadius: 999,
       border: "1px solid #E5E7EB",
       fontSize: 13,
-    } as React.CSSProperties,
-    errorText: {
-      marginTop: 12,
-      fontSize: 13,
-      color: "#DC2626",
     },
+
+    // Result
     resultCard: {
-      background: "#FFFFFF",
+      background: "#FFF",
       borderRadius: 16,
       padding: "16px 20px",
-      boxShadow: "0 10px 24px rgba(15,23,42,0.04)",
       border: "1px solid #E5E7EB",
       marginTop: 20,
       marginBottom: 20,
-    } as React.CSSProperties,
-    totalLine: {
-      fontSize: 18,
-      fontWeight: 600,
-      color: "#111827",
     },
+
     tableCard: {
-      background: "#FFFFFF",
+      background: "#FFF",
       borderRadius: 16,
       border: "1px solid #E5E7EB",
       overflow: "hidden",
-    } as React.CSSProperties,
-    tableHeaderRow: {
-      background: "#F9FAFB",
-    } as React.CSSProperties,
+    },
+
     th: {
-      textAlign: "left" as const,
       padding: "10px 16px",
       fontSize: 13,
       fontWeight: 600,
       color: "#6B7280",
       borderBottom: "1px solid #E5E7EB",
+      textAlign: "left" as const,
     },
+
     td: {
       padding: "10px 16px",
       fontSize: 14,
       color: "#111827",
       borderBottom: "1px solid #F3F4F6",
     },
+
+    // Leaderboard
     leaderboardCard: {
-      background: "#FFFFFF",
+      background: "#FFF",
       borderRadius: 16,
       border: "1px solid #E5E7EB",
       padding: "16px 20px",
       marginTop: 24,
-    } as React.CSSProperties,
+    },
+
     lbRow: {
       display: "flex",
       alignItems: "center",
       justifyContent: "space-between",
       padding: "8px 0",
       borderBottom: "1px solid #F3F4F6",
-    } as React.CSSProperties,
+    },
+
     avatar: {
       width: 40,
       height: 40,
       borderRadius: "50%",
       objectFit: "cover" as const,
-      background: "#F9FAFB",
     },
-    avatarFallback: {
-      width: 40,
-      height: 40,
-      borderRadius: "50%",
-      background: "#2563EB",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      color: "#FFFFFF",
-      fontWeight: 700,
-    } as React.CSSProperties,
-    footer: {
-      marginTop: 32,
-      fontSize: 12,
-      color: "#9CA3AF",
-      textAlign: "center" as const,
-    } as React.CSSProperties,
   };
 
   return (
     <main style={styles.main}>
       <h1 style={styles.title}>Sentient Keyword Counter</h1>
+
       <p style={styles.tagline}>
         Download your data from X, upload the <b>tweets.js</b> or{" "}
-        <b>tweets.csv</b> file, and we’ll analyze your entire history for
-        Sentient-related keywords.
+        <b>tweets.csv</b> file.
       </p>
+
       <p style={styles.tagline2}>
-        See how much you contribute to Sentient on X. We count posts, replies,
-        quotes and retweets containing <b>gsent</b>, <b>Sentient</b>,{" "}
-        <b>Dobby</b>, <b>GRID</b>, <b>ROMA</b>, <b>OML</b>, <b>Fingerprint</b>,{" "}
-        <b>Loyal AI</b>.
+        We count all posts, replies, quotes and retweets containing:{" "}
+        <b>gsent</b>, <b>Sentient</b>, <b>Dobby</b>, <b>GRID</b>, <b>ROMA</b>,{" "}
+        <b>OML</b>, <b>Fingerprint</b>, <b>Loyal AI</b>.
       </p>
 
-      {/* Upload card */}
       <section style={styles.uploadCard}>
-        <div style={{ fontSize: 14, color: "#374151", fontWeight: 600 }}>
-          Upload your X archive file
-        </div>
-
-        {/* Archive instructions */}
+        <div style={{ fontSize: 15, fontWeight: 600 }}>Upload your X archive</div>
         <p style={{ fontSize: 13, color: "#6B7280", marginTop: 4 }}>
-          <strong>How to download your X archive?</strong>
+          How to download your X archive?
           <br />
-          X → Settings &amp; Privacy → Your Account →{" "}
-          <span style={{ fontWeight: 600 }}>Download an archive of your data</span>.
+          Settings &gt; Privacy &gt; Your Account → Download an archive of your data.
+          (May take ~24 hours)
           <br />
-          (Archive preparation may take up to ~24 hours. When ready, X will
-          notify you.)
-        </p>
-
-        <p style={{ fontSize: 13, color: "#6B7280", marginTop: 4 }}>
-          <strong>How to upload?</strong>
           <br />
-          Open the downloaded ZIP file → go to{" "}
-          <span style={{ fontWeight: 600 }}>data</span> → upload{" "}
-          <code>tweets.js</code> or <code>tweets.csv</code> here.
+          How to upload?
           <br />
-          We only read the tweet text in your browser —{" "}
-          <span style={{ fontWeight: 600 }}>nothing is sent to a server</span>.
+          Open ZIP → go to <b>data</b> → upload <b>tweets.js</b> or{" "}
+          <b>tweets.csv</b>. Everything is processed in your browser.
         </p>
 
         <div style={styles.fileRow}>
-          <div style={styles.fileInput}>
-            <input
-              type="file"
-              accept=".js,.csv"
-              onChange={handleFileChange}
-            />
-          </div>
-          {fileName && (
-            <span style={{ fontSize: 13, color: "#4B5563" }}>{fileName}</span>
-          )}
+          <input type="file" accept=".js,.csv" onChange={handleFileChange} />
+          {fileName && <span>{fileName}</span>}
         </div>
 
-        <div style={styles.smallInputRow}>
+        {/* User inputs */}
+        <div style={{ display: "flex", gap: 12, marginTop: 16 }}>
           <input
             style={styles.textInput}
-            placeholder="Display name (for leaderboard)"
+            placeholder="Display name"
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
           />
           <input
             style={styles.textInput}
-            placeholder="X handle (e.g. kubilay)"
+            placeholder="X handle (without @)"
             value={handle}
             onChange={(e) => setHandle(e.target.value)}
           />
-          <div>
-            <label
-              style={{
-                display: "block",
-                fontSize: 12,
-                color: "#6B7280",
-                marginBottom: 4,
-              }}
-            >
-              Avatar (optional)
-            </label>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleAvatarFileChange}
-            />
-            {avatarFileName && (
-              <div
-                style={{
-                  fontSize: 11,
-                  color: "#9CA3AF",
-                  marginTop: 2,
-                }}
-              >
-                {avatarFileName}
-              </div>
-            )}
-          </div>
+        </div>
+
+        {/* Avatar */}
+        <div style={{ marginTop: 16 }}>
+          <label style={{ fontSize: 12, color: "#6B7280" }}>
+            Avatar (optional)
+          </label>
+          <input type="file" accept="image/*" onChange={handleAvatarFileChange} />
+          {avatarFileName && (
+            <div style={{ fontSize: 11, color: "#9CA3AF" }}>{avatarFileName}</div>
+          )}
         </div>
 
         <button
-          type="button"
           style={styles.btnPrimary}
           onClick={analyzeArchive}
           disabled={status === "parsing"}
         >
-          {status === "parsing" ? "Parsing archive…" : "Analyze Archive"}
+          {status === "parsing" ? "Parsing..." : "Analyze Archive"}
         </button>
 
-        {error && <div style={styles.errorText}>{error}</div>}
+        {error && <div style={{ color: "#DC2626", marginTop: 8 }}>{error}</div>}
       </section>
 
-      {/* Result summary */}
       {stats && (
         <>
           <section style={styles.resultCard}>
-            <div style={{ fontSize: 14, color: "#6B7280", marginBottom: 4 }}>
-              All-time summary
-            </div>
-            <div style={styles.totalLine}>
-              Total Keywords:{" "}
-              <span style={{ color: "#2563EB" }}>{totalKeywords}</span>
+            <div style={{ fontSize: 14, color: "#6B7280" }}>All-time summary</div>
+            <div style={{ fontSize: 20, fontWeight: 700 }}>
+              Total Keywords: <span style={{ color: "#2563EB" }}>{totalKeywords}</span>
             </div>
           </section>
 
-          {/* Keyword breakdown table */}
           <section style={styles.tableCard}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead style={styles.tableHeaderRow}>
+              <thead>
                 <tr>
                   <th style={styles.th}>Keyword</th>
                   <th style={styles.th}>Total</th>
                 </tr>
               </thead>
               <tbody>
-                {stats.map((row) => (
-                  <tr key={row.label}>
-                    <td style={styles.td}>{row.label}</td>
-                    <td style={styles.td}>{row.total}</td>
+                {stats.map((s) => (
+                  <tr key={s.label}>
+                    <td style={styles.td}>{s.label}</td>
+                    <td style={styles.td}>{s.total}</td>
                   </tr>
                 ))}
               </tbody>
@@ -566,91 +413,71 @@ export default function Home() {
         </>
       )}
 
-      {/* Local leaderboard */}
+      {/* Leaderboard */}
       {leaderboard.length > 0 && (
         <section style={styles.leaderboardCard}>
-          <div
-            style={{
-              fontSize: 14,
-              fontWeight: 600,
-              color: "#374151",
-              marginBottom: 8,
-            }}
-          >
-            Leaderboard (this browser)
+          <div style={{ fontSize: 15, fontWeight: 600 }}>Leaderboard</div>
+          <div style={{ fontSize: 12, color: "#6B7280", marginBottom: 8 }}>
+            Sorted by keyword count. Re-analyzing updates your entry.
           </div>
+
+          {leaderboard.map((u, i) => (
+            <div key={u.id} style={styles.lbRow}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                {u.avatarUrl ? (
+                  <img src={u.avatarUrl} style={styles.avatar} />
+                ) : (
+                  <div
+                    style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: "50%",
+                      background: "#2563EB",
+                      color: "#FFF",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontWeight: 700,
+                    }}
+                  >
+                    {u.name.charAt(0).toUpperCase()}
+                  </div>
+                )}
+
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 600 }}>
+                    {i + 1}. {u.name}
+                  </div>
+                  <div style={{ fontSize: 12, color: "#6B7280" }}>
+                    {u.handle} — {u.date}
+                  </div>
+                </div>
+              </div>
+
+              <div
+                style={{
+                  fontSize: 16,
+                  fontWeight: 700,
+                  color: "#2563EB",
+                }}
+              >
+                {u.totalKeywords}
+              </div>
+            </div>
+          ))}
+
           <div
             style={{
               fontSize: 12,
               color: "#9CA3AF",
-              marginBottom: 8,
+              marginTop: 20,
+              textAlign: "center" as const,
             }}
           >
-            Sorted by total keyword count. Each new archive you analyze updates
-            your entry here.
+            built by <b>kubilavax (@avaxcrypto)</b>
           </div>
-          {leaderboard.map((user, index) => (
-            <div key={user.id} style={styles.lbRow}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                {user.avatarUrl ? (
-                  <img
-                    src={user.avatarUrl}
-                    alt={user.name}
-                    style={styles.avatar}
-                  />
-                ) : (
-                  <div style={styles.avatarFallback}>
-                    {user.name.charAt(0).toUpperCase()}
-                  </div>
-                )}
-                <div>
-                  <div
-                    style={{
-                      fontSize: 14,
-                      fontWeight: 600,
-                      color: "#111827",
-                    }}
-                  >
-                    {index + 1}. {user.name}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 12,
-                      color: "#6B7280",
-                    }}
-                  >
-                    {user.handle}
-                  </div>
-                  {user.uploadDate && (
-                    <div
-                      style={{
-                        fontSize: 11,
-                        color: "#9CA3AF",
-                        marginTop: 2,
-                      }}
-                    >
-                      Last upload: {formatUploadDate(user.uploadDate)}
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div
-                style={{
-                  fontSize: 14,
-                  fontWeight: 600,
-                  color: "#2563EB",
-                }}
-              >
-                {user.totalKeywords}
-              </div>
-            </div>
-          ))}
         </section>
       )}
-
-      <footer style={styles.footer}>
-        Developed by <strong>kubilavax</strong> (<span>@avaxcrypto</span>)
-      </footer>
     </main>
   );
 }

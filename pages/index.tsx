@@ -383,7 +383,7 @@ export default function Home() {
     leaderboardCard: {
       background: "#FFFFFF",
       borderRadius: 16,
-      border: "1px solid "#E5E7EB",
+      border: "1px solid #E5E7EB",
       padding: "16px 20px",
       marginTop: 24,
     } as React.CSSProperties,

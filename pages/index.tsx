@@ -157,7 +157,7 @@ export default function Home() {
         );
       }
 
-      // Keyword sayımı
+      // Keyword sayımı (case-insensitive, substring)
       const statsResult: KeywordStat[] = KEYWORDS.map((label) => {
         const kw = label.toLowerCase();
         let total = 0;
@@ -215,8 +215,7 @@ export default function Home() {
       maxWidth: 960,
       margin: "40px auto",
       padding: "0 16px 40px",
-      fontFamily:
-        "Inter, system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
+      fontFamily: "Inter, system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
       color: "#111827",
     } as React.CSSProperties,
     title: {
@@ -377,10 +376,27 @@ export default function Home() {
         <div style={{ fontSize: 14, color: "#374151", fontWeight: 600 }}>
           Upload your X archive file
         </div>
+
+        {/* Yeni açıklama metni */}
         <p style={{ fontSize: 13, color: "#6B7280", marginTop: 4 }}>
-          Use the <b>tweets.js</b> or <b>tweets.csv</b> file from your X archive
-          download. We only read tweet text in your browser; nothing is sent to
-          a server.
+          <strong>How to download your X archive?</strong>
+          <br />
+          X → Settings &amp; Privacy → Your Account →{" "}
+          <span style={{ fontWeight: 600 }}>Download an archive of your data</span>.
+          <br />
+          (Archive preparation may take up to ~24 hours. When ready, X will
+          notify you.)
+        </p>
+
+        <p style={{ fontSize: 13, color: "#6B7280", marginTop: 4 }}>
+          <strong>How to upload?</strong>
+          <br />
+          Open the downloaded ZIP file → go to{" "}
+          <span style={{ fontWeight: 600 }}>data</span> → upload{" "}
+          <code>tweets.js</code> or <code>tweets.csv</code> here.
+          <br />
+          We only read the tweet text in your browser —{" "}
+          <span style={{ fontWeight: 600 }}>nothing is sent to a server</span>.
         </p>
 
         <div style={styles.fileRow}>

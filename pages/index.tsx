@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 
 type KeywordStat = { label: string; total: number };
 
@@ -215,9 +215,10 @@ export default function Home() {
       maxWidth: 960,
       margin: "40px auto",
       padding: "0 16px 40px",
-      fontFamily: "Inter, system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
+      fontFamily:
+        "Inter, system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
       color: "#111827",
-    } as React.CSSProperties,
+    },
     title: {
       fontSize: 40,
       fontWeight: 800,
@@ -243,7 +244,7 @@ export default function Home() {
       boxShadow: "0 12px 30px rgba(15,23,42,0.06)",
       border: "1px solid #E5E7EB",
       marginBottom: 24,
-    } as React.CSSProperties,
+    },
     fileRow: {
       display: "flex",
       flexWrap: "wrap" as const,
@@ -264,7 +265,7 @@ export default function Home() {
       fontWeight: 600,
       cursor: "pointer",
       marginTop: 12,
-    } as React.CSSProperties,
+    },
     smallInputRow: {
       display: "flex",
       flexWrap: "wrap" as const,
@@ -279,7 +280,7 @@ export default function Home() {
       borderRadius: 999,
       border: "1px solid #E5E7EB",
       fontSize: 13,
-    } as React.CSSProperties,
+    },
     errorText: {
       marginTop: 12,
       fontSize: 13,
@@ -293,7 +294,7 @@ export default function Home() {
       border: "1px solid #E5E7EB",
       marginTop: 20,
       marginBottom: 20,
-    } as React.CSSProperties,
+    },
     totalLine: {
       fontSize: 18,
       fontWeight: 600,
@@ -302,12 +303,12 @@ export default function Home() {
     tableCard: {
       background: "#FFFFFF",
       borderRadius: 16,
-      border: "1px solid #E5E7EB",
+      border: "1px solid "#E5E7EB",
       overflow: "hidden",
-    } as React.CSSProperties,
+    } as any, // küçük hack, istersen as any'yi kaldırabilirsin
     tableHeaderRow: {
       background: "#F9FAFB",
-    } as React.CSSProperties,
+    },
     th: {
       textAlign: "left" as const,
       padding: "10px 16px",
@@ -328,14 +329,14 @@ export default function Home() {
       border: "1px solid #E5E7EB",
       padding: "16px 20px",
       marginTop: 24,
-    } as React.CSSProperties,
+    },
     lbRow: {
       display: "flex",
       alignItems: "center",
       justifyContent: "space-between",
       padding: "8px 0",
       borderBottom: "1px solid #F3F4F6",
-    } as React.CSSProperties,
+    },
     avatar: {
       width: 40,
       height: 40,
@@ -353,7 +354,7 @@ export default function Home() {
       justifyContent: "center",
       color: "#FFFFFF",
       fontWeight: 700,
-    } as React.CSSProperties,
+    },
   };
 
   return (
